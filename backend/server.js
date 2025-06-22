@@ -100,28 +100,38 @@
 // );
 // server.js
 
-require("dotenv").config(); 
+require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
 const { spawn } = require("child_process");
 
 const app = express();
-
-// Load environment variables
 const PORT = process.env.PORT || 5000;
-const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 
-// Middleware
-app.use(cors({ origin: CORS_ORIGIN }));
+// ✅ CORS config for dev and production
+const corsOptions = {
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      "http://localhost:3000",
+      "https://ydownloader-stm.vercel.app"
+    ];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
-// Health check route
+// ✅ Health check
 app.get("/", (req, res) => {
   res.send("✅ YouTube Downloader backend is running.");
 });
 
-// SSE Download Progress Route
+// ✅ Download progress (SSE)
 app.get("/download-progress", (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).end("Missing URL");
@@ -167,7 +177,7 @@ app.get("/download-progress", (req, res) => {
   });
 });
 
-// Video Metadata Route
+// ✅ Video metadata route
 app.get("/metadata", (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).send("Missing URL");
@@ -199,7 +209,12 @@ app.get("/metadata", (req, res) => {
         duration: new Date(meta.duration * 1000)
           .toISOString()
           .substr(11, 8),
-        hashtags: meta.tags ? "#" + meta.tags.join(" #") : "",
+        hashtags: meta.tags
+          ? meta.tags
+              .map(tag => tag.replace(/^#+/, ""))
+              .map(tag => `#${tag}`)
+              .join(" ")
+          : "",
         formats,
       });
     } catch (err) {
@@ -209,8 +224,7 @@ app.get("/metadata", (req, res) => {
   });
 });
 
-// Start server
+// ✅ Start server
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
-
