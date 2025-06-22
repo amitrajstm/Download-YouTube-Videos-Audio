@@ -99,20 +99,29 @@
 //   console.log(`Server running on http://localhost:${PORT}`)
 // );
 // server.js
+
+require("dotenv").config(); 
+
 const express = require("express");
 const cors = require("cors");
 const { spawn } = require("child_process");
 
 const app = express();
-app.use(cors());
+
+// Load environment variables
+const PORT = process.env.PORT || 5000;
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
+
+// Middleware
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
-// Health Check Route
+// Health check route
 app.get("/", (req, res) => {
-  res.send("YouTube Downloader backend is running.");
+  res.send("✅ YouTube Downloader backend is running.");
 });
 
-// Progress Download Route
+// SSE Download Progress Route
 app.get("/download-progress", (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).end("Missing URL");
@@ -147,7 +156,7 @@ app.get("/download-progress", (req, res) => {
   });
 
   ytProcess.on("close", (code) => {
-    console.log(`Download exited with code ${code}`);
+    console.log(`Download process exited with code ${code}`);
     res.end();
   });
 
@@ -158,7 +167,7 @@ app.get("/download-progress", (req, res) => {
   });
 });
 
-// Metadata Route
+// Video Metadata Route
 app.get("/metadata", (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).send("Missing URL");
@@ -175,7 +184,7 @@ app.get("/metadata", (req, res) => {
       const meta = JSON.parse(jsonData);
 
       const formats = meta.formats
-        .filter((f) => f.filesize) // ❌ Remove formats with unknown size
+        .filter((f) => f.filesize)
         .map((f) => ({
           quality: f.format_note || (f.height ? `${f.height}p` : f.format_id),
           size: `${(f.filesize / 1024 / 1024).toFixed(2)}M`,
@@ -201,7 +210,7 @@ app.get("/metadata", (req, res) => {
 });
 
 // Start server
-const PORT = 5000;
-app.listen(PORT, () =>
-  console.log(`Server running on http://localhost:${PORT}`)
-);
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
+

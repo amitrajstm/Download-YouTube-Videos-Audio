@@ -48,8 +48,8 @@ export default function SearchBar({ onSearch }) {
   const handlePaste = async () => {
     try {
       const text = await navigator.clipboard.readText();
-      setUrl(text);
-    } catch {
+      if (text) setUrl(text);
+    } catch (err) {
       alert("Failed to read clipboard content");
     }
   };
@@ -60,11 +60,19 @@ export default function SearchBar({ onSearch }) {
     if (!url) {
       try {
         const text = await navigator.clipboard.readText();
-        setUrl(text);
+        if (text) setUrl(text);
       } catch {
         console.warn("Clipboard access denied");
       }
     }
+  };
+
+  const handleSearch = () => {
+    if (!url.trim()) {
+      alert("Please enter a valid video URL or search term.");
+      return;
+    }
+    onSearch(url.trim());
   };
 
   return (
@@ -85,7 +93,7 @@ export default function SearchBar({ onSearch }) {
           <FaPaste />
         </button>
       )}
-      <button className="search-btn" onClick={() => onSearch(url)}>
+      <button className="search-btn" onClick={handleSearch}>
         <FaSearch /> Search
       </button>
     </div>

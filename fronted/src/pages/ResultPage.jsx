@@ -1,4 +1,3 @@
-// src/pages/ResultPage.jsx
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { FaSpinner } from "react-icons/fa";
@@ -6,35 +5,47 @@ import VideoDetails from "../components/VideoDetails";
 import FormatTable from "../components/FormatTable";
 import DownloadHistory from "../components/DownloadHistory";
 
+// ✅ Use environment variable for backend base URL
+const API_BASE = import.meta.env.VITE_API_URL || "";
+
 export default function ResultPage() {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState([]);
+
   const query = new URLSearchParams(useLocation().search);
   const url = query.get("url");
 
   useEffect(() => {
-    setData(null); // reset when url changes
-    fetch(`/metadata?url=${encodeURIComponent(url)}`)
-      .then((res) => res.json())
+    if (!url) return;
+
+    setData(null); // Reset previous result
+    fetch(`${API_BASE}/metadata?url=${encodeURIComponent(url)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Metadata fetch failed");
+        return res.json();
+      })
       .then(setData)
-      .catch(console.error);
+      .catch((err) => {
+        console.error("Error loading metadata:", err);
+        setData(null);
+      });
   }, [url]);
 
   const handleDownload = (format) => {
     window.open(format.url, "_blank");
-    setHistory((h) => [...h, format]);
+    setHistory((prev) => [...prev, format]);
   };
 
   if (!data) {
     return (
-      <div className="loader-wrapper">
-        <FaSpinner className="spinner" />
+      <div className="loader-wrapper flex justify-center items-center h-40">
+        <FaSpinner className="spinner animate-spin text-3xl text-blue-500" />
       </div>
     );
   }
 
   return (
-    <div className="result-page">
+    <div className="result-page space-y-6 p-4 max-w-2xl mx-auto">
       <FormatTable formats={data.formats} onDownload={handleDownload} />
       <VideoDetails
         thumbnail={data.thumbnail}
