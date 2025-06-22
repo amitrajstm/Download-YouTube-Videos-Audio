@@ -107,31 +107,19 @@ const cors = require("cors");
 const { spawn } = require("child_process");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// ✅ CORS config for dev and production
-const corsOptions = {
-  origin: (origin, callback) => {
-    const allowedOrigins = [
-      "http://localhost:3000",
-      "https://ydownloader-stm.vercel.app"
-    ];
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-};
-app.use(cors(corsOptions));
+const PORT = process.env.PORT || 5000;
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
+
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
-// ✅ Health check
+// Health check
 app.get("/", (req, res) => {
   res.send("✅ YouTube Downloader backend is running.");
 });
 
-// ✅ Download progress (SSE)
+// Download progress (SSE)
 app.get("/download-progress", (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).end("Missing URL");
@@ -141,7 +129,7 @@ app.get("/download-progress", (req, res) => {
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
 
-  const ytProcess = spawn("yt-dlp", [
+  const ytProcess = spawn("./yt-dlp", [
     "-f", "bestvideo+bestaudio",
     "--merge-output-format", "mp4",
     "--restrict-filenames",
@@ -177,12 +165,12 @@ app.get("/download-progress", (req, res) => {
   });
 });
 
-// ✅ Video metadata route
+// Metadata route
 app.get("/metadata", (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).send("Missing URL");
 
-  const ytProcess = spawn("yt-dlp", ["-J", url]);
+  const ytProcess = spawn("./yt-dlp", ["-J", url]);
   let jsonData = "";
 
   ytProcess.stdout.on("data", (data) => {
@@ -206,15 +194,8 @@ app.get("/metadata", (req, res) => {
       res.json({
         title: meta.title,
         thumbnail: meta.thumbnail,
-        duration: new Date(meta.duration * 1000)
-          .toISOString()
-          .substr(11, 8),
-        hashtags: meta.tags
-          ? meta.tags
-              .map(tag => tag.replace(/^#+/, ""))
-              .map(tag => `#${tag}`)
-              .join(" ")
-          : "",
+        duration: new Date(meta.duration * 1000).toISOString().substr(11, 8),
+        hashtags: meta.tags ? "#" + meta.tags.join(" #") : "",
         formats,
       });
     } catch (err) {
@@ -222,9 +203,13 @@ app.get("/metadata", (req, res) => {
       res.status(500).send("Error parsing metadata");
     }
   });
+
+  ytProcess.on("error", (err) => {
+    console.error("yt-dlp error:", err);
+    res.status(500).send("yt-dlp execution failed");
+  });
 });
 
-// ✅ Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
