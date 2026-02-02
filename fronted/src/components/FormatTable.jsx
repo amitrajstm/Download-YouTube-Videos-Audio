@@ -1,12 +1,20 @@
-// src/components/FormatTable.jsx
 import React from "react";
 import { FaMusic } from "react-icons/fa";
 
-const VIDEO_RESOLUTIONS = ["360p", "480p", "720p", "1080p"];
+const VIDEO_RESOLUTIONS = [
+  "144p",
+  "240p",
+  "360p",
+  "480p",
+  "720p",
+  "1080p",
+  "1440p",
+  "2160p",
+];
 
 export default function FormatTable({ formats, onDownload }) {
   const audioFormat = formats.find(
-    (f) => f.type === "audio" && f.size !== "N/A"
+    (f) => f.type === "audio" && f.size !== "N/A",
   );
 
   const mp4WithAudio = formats
@@ -16,12 +24,12 @@ export default function FormatTable({ formats, onDownload }) {
         f.ext === "mp4" &&
         f.acodec !== "none" &&
         f.size !== "N/A" &&
-        VIDEO_RESOLUTIONS.includes(f.quality)
+        VIDEO_RESOLUTIONS.includes(f.quality),
     )
     .sort(
       (a, b) =>
         VIDEO_RESOLUTIONS.indexOf(a.quality) -
-        VIDEO_RESOLUTIONS.indexOf(b.quality)
+        VIDEO_RESOLUTIONS.indexOf(b.quality),
     );
 
   return (
