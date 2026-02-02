@@ -3,7 +3,6 @@ import { useLocation } from "react-router-dom";
 import { FaSpinner } from "react-icons/fa";
 import VideoDetails from "../components/VideoDetails";
 import FormatTable from "../components/FormatTable";
-import DownloadHistory from "../components/DownloadHistory";
 
 // ✅ Use environment variable for backend base URL
 const API_BASE = import.meta.env.VITE_API_URL || "";
@@ -53,7 +52,6 @@ export default function ResultPage() {
         hashtags={data.hashtags}
         duration={data.duration}
       />
-      <DownloadHistory history={history} />
     </div>
   );
 }
