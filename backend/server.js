@@ -63,13 +63,16 @@ app.get("/metadata", (req, res) => {
     return res.status(500).json({ error: "yt-dlp not found on server" });
   }
 
-  const yt = spawn(YTDLP_PATH, [
-    "-J",
-    "--no-playlist",
-    "--user-agent",
-    "Mozilla/5.0",
-    url,
-  ]);
+const yt = spawn(YTDLP_PATH, [
+  "-J",
+  "--no-playlist",
+  "--js-runtimes",
+  "node",
+  "--user-agent",
+  "Mozilla/5.0",
+  url,
+]);
+
 
   let stdout = "";
   let stderr = "";
