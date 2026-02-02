@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const { spawn } = require("child_process");
 const path = require("path");
+const fs = require("fs");
 
 const app = express();
 
@@ -11,8 +12,8 @@ const app = express();
 
 const PORT = process.env.PORT || 5000;
 
-// allow Vercel frontend + local dev
-const CORS_ORIGIN = process.env.CORS_ORIGIN || [
+// allow frontend (Vercel) + local dev
+const ALLOWED_ORIGINS = [
   "https://ytdownloader-stm.vercel.app",
   "http://localhost:3000",
 ];
@@ -24,49 +25,69 @@ const YTDLP_PATH = path.join(process.cwd(), "yt-dlp");
 
 app.use(
   cors({
-    origin: CORS_ORIGIN,
-    methods: ["GET", "POST"],
+    origin: (origin, cb) => {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        cb(null, true);
+      } else {
+        cb(new Error("CORS not allowed"));
+      }
+    },
   }),
 );
 
 app.use(express.json());
 
-/* ================= HEALTH CHECK ================= */
+/* ================= HEALTH ================= */
 
 app.get("/", (req, res) => {
-  res.send("✅ YouTube Downloader backend is running.");
+  res.send("✅ YouTube Downloader backend running");
 });
 
-/* ================= METADATA ROUTE ================= */
+/* ================= DEBUG (TEMPORARY BUT SAFE) ================= */
+
+app.get("/debug", (req, res) => {
+  res.json({
+    cwd: process.cwd(),
+    ytDlpExists: fs.existsSync(YTDLP_PATH),
+    files: fs.readdirSync(process.cwd()),
+  });
+});
+
+/* ================= METADATA ================= */
 
 app.get("/metadata", (req, res) => {
   const { url } = req.query;
+  if (!url) return res.status(400).json({ error: "Missing URL" });
 
-  if (!url) {
-    return res.status(400).json({ error: "Missing URL" });
+  if (!fs.existsSync(YTDLP_PATH)) {
+    return res.status(500).json({ error: "yt-dlp not found on server" });
   }
 
-  const ytProcess = spawn(YTDLP_PATH, ["-J", url]);
+  const yt = spawn(YTDLP_PATH, [
+    "-J",
+    "--no-playlist",
+    "--user-agent",
+    "Mozilla/5.0",
+    url,
+  ]);
 
-  let stdoutData = "";
-  let stderrData = "";
+  let stdout = "";
+  let stderr = "";
 
-  ytProcess.stdout.on("data", (data) => {
-    stdoutData += data.toString();
-  });
+  yt.stdout.on("data", (d) => (stdout += d.toString()));
+  yt.stderr.on("data", (d) => (stderr += d.toString()));
 
-  ytProcess.stderr.on("data", (data) => {
-    stderrData += data.toString();
-  });
-
-  ytProcess.on("close", (code) => {
+  yt.on("close", (code) => {
     if (code !== 0) {
-      console.error("❌ yt-dlp failed:", stderrData);
-      return res.status(500).json({ error: "yt-dlp failed" });
+      console.error("❌ yt-dlp stderr:", stderr);
+      return res.status(500).json({
+        error: "yt-dlp failed",
+        details: stderr.slice(0, 500),
+      });
     }
 
     try {
-      const meta = JSON.parse(stdoutData);
+      const meta = JSON.parse(stdout);
 
       const formats = meta.formats
         .filter(
@@ -96,17 +117,17 @@ app.get("/metadata", (req, res) => {
       });
     } catch (err) {
       console.error("❌ JSON parse error:", err);
-      res.status(500).json({ error: "Metadata parse error" });
+      res.status(500).json({ error: "Failed to parse metadata" });
     }
   });
 
-  ytProcess.on("error", (err) => {
-    console.error("❌ yt-dlp spawn error:", err);
-    res.status(500).json({ error: "yt-dlp execution failed" });
+  yt.on("error", (err) => {
+    console.error("❌ spawn error:", err);
+    res.status(500).json({ error: "yt-dlp spawn failed" });
   });
 });
 
-/* ================= START SERVER ================= */
+/* ================= START ================= */
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
