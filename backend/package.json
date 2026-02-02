@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "postinstall": "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe -o yt-dlp.exe",
+    "postinstall": "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp && chmod +x yt-dlp",
     "start": "node server.js"
-    
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -13,7 +12,3 @@
     "express": "^5.1.0"
   }
 }
-
-
-
-
