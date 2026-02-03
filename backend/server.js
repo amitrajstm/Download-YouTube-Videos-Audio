@@ -5,21 +5,30 @@ const cors = require("cors");
 const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 
 const app = express();
 
 /* ================= CONFIG ================= */
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
 
-// allow frontend (Vercel) + local dev
 const ALLOWED_ORIGINS = [
   "https://ytdownloader-stm.vercel.app",
   "http://localhost:3000",
 ];
 
-// yt-dlp binary downloaded in postinstall
 const YTDLP_PATH = path.join(process.cwd(), "yt-dlp");
+const COOKIES_PATH = path.join(os.tmpdir(), "yt-cookies.txt");
+
+/* ================= COOKIES SETUP ================= */
+
+if (process.env.YT_COOKIES) {
+  fs.writeFileSync(COOKIES_PATH, process.env.YT_COOKIES);
+  console.log("✅ YouTube cookies loaded");
+} else {
+  console.warn("⚠️ No YT_COOKIES provided");
+}
 
 /* ================= MIDDLEWARE ================= */
 
@@ -29,7 +38,7 @@ app.use(
       if (!origin || ALLOWED_ORIGINS.includes(origin)) {
         cb(null, true);
       } else {
-        cb(new Error("CORS not allowed"));
+        cb(new Error("CORS blocked"));
       }
     },
   }),
@@ -43,16 +52,6 @@ app.get("/", (req, res) => {
   res.send("✅ YouTube Downloader backend running");
 });
 
-/* ================= DEBUG (TEMPORARY BUT SAFE) ================= */
-
-app.get("/debug", (req, res) => {
-  res.json({
-    cwd: process.cwd(),
-    ytDlpExists: fs.existsSync(YTDLP_PATH),
-    files: fs.readdirSync(process.cwd()),
-  });
-});
-
 /* ================= METADATA ================= */
 
 app.get("/metadata", (req, res) => {
@@ -60,19 +59,25 @@ app.get("/metadata", (req, res) => {
   if (!url) return res.status(400).json({ error: "Missing URL" });
 
   if (!fs.existsSync(YTDLP_PATH)) {
-    return res.status(500).json({ error: "yt-dlp not found on server" });
+    return res.status(500).json({ error: "yt-dlp not found" });
   }
 
-const yt = spawn(YTDLP_PATH, [
-  "-J",
-  "--no-playlist",
-  "--js-runtimes",
-  "node",
-  "--user-agent",
-  "Mozilla/5.0",
-  url,
-]);
+  const args = [
+    "-J",
+    "--no-playlist",
+    "--js-runtimes",
+    "node",
+    "--user-agent",
+    "Mozilla/5.0",
+  ];
 
+  if (fs.existsSync(COOKIES_PATH)) {
+    args.push("--cookies", COOKIES_PATH);
+  }
+
+  args.push(url);
+
+  const yt = spawn(YTDLP_PATH, args);
 
   let stdout = "";
   let stderr = "";
@@ -82,10 +87,10 @@ const yt = spawn(YTDLP_PATH, [
 
   yt.on("close", (code) => {
     if (code !== 0) {
-      console.error("❌ yt-dlp stderr:", stderr);
+      console.error("❌ yt-dlp error:", stderr);
       return res.status(500).json({
         error: "yt-dlp failed",
-        details: stderr.slice(0, 500),
+        details: stderr.slice(0, 600),
       });
     }
 
@@ -115,17 +120,16 @@ const yt = spawn(YTDLP_PATH, [
               .toISOString()
               .substring(11, 19)
           : null,
-        hashtags: meta.tags ? "#" + meta.tags.join(" #") : "",
         formats,
       });
     } catch (err) {
       console.error("❌ JSON parse error:", err);
-      res.status(500).json({ error: "Failed to parse metadata" });
+      res.status(500).json({ error: "Metadata parse failed" });
     }
   });
 
   yt.on("error", (err) => {
-    console.error("❌ spawn error:", err);
+    console.error("❌ Spawn failed:", err);
     res.status(500).json({ error: "yt-dlp spawn failed" });
   });
 });
@@ -135,3 +139,4 @@ const yt = spawn(YTDLP_PATH, [
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
